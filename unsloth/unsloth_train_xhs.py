@@ -172,7 +172,7 @@ model = FastLanguageModel.get_peft_model(
 8、配置训练器超参
 """
 
-args = new TrainningArguments(
+args = new TrainingArguments(
     per_device_train_batch_size=2, #每个设备批次大小
     gradient_accumulation_steps=4,  # 梯度累积步数，批次大小建议调整这个（变相模拟更大batch_size）  总批次大小=per_device_train_batch_size*gradient_accumulation_steps = 8
     warmup_steps=5,  # 学习率预热步数。
