@@ -1,16 +1,18 @@
-
+﻿
 """
 1、处理数据集
 """
-from click.core import batch
-from datasets import load_dateset
+from datasets import load_dataset
 import json
+
+from transformers import TrainingArguments
+
 
 # 加载huggingface数据集  使用 streaming=True 避免一次性下载全部数据
 # dataset = load_dateset("Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT",streaming=True)
 
-#加载本地数据集
-dataset = load_dateset("/data/llm/dataset/Congliu/Chinese-DeepSeek-R1-Distill-data-110k-SFT")
+
+dataset = load_dataset("json",data_files="/data/code/dataset/distill_r1_110k_sft.json")
 
 # 过滤数据 使用lambda匿名函数 过滤小红书数据
 filtered_dateset = dataset.filter(lambda example: example["repo_name"]== 'xhs/xhs')
@@ -38,10 +40,10 @@ print("数据已保存到 xhs_data.json")
 """
 
 import wandb
-wb_token = ""  #官网免费申请
+wb_token="925e23f1738a026ef3f4dea9ddd6791c231fa4de"  #官网免费申请
 wandb.login(key=wb_token)
 run = wandb.init(
-    project='fine_tune_DeepSeek-R1-Distill-Qwen-14B on xhs sheet',
+    project='HOME fine_tune_DeepSeek-R1-Distill-Qwen-7B on xhs sheet',
     job_type="training",
     anonymous="allow"
 )
@@ -53,7 +55,7 @@ run = wandb.init(
 """
 3、加载模型和分词器
 """
-from unsloth import FastLanguageModel
+from unsloth import FastLanguageModel, is_bfloat16_supported
 
 #  设置最大上下数，建议测试时2048
 max_seq_length = 2048
@@ -66,7 +68,7 @@ load_in_4bit = True
 
 # 加载模型和对应的tokenizer
 model,tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/DeepSeek-R1-Distill-Qwen-14B",
+    model_name = "/data/code/llm/models /DeepSeek-R1-Distill-Qwen-7B",
     max_seq_length = max_seq_length,  #控制上下文长度，建议测试时2048
     dtype = dtype, #在新一代的GPU建议使用torch.float16或者torch.bfloat16
     load_in_4bit = load_in_4bit  #开启4位量化，降低4倍显存微调可以运行在16G显存，在GPU可以设置none，比如H100提升准确率
@@ -172,7 +174,7 @@ model = FastLanguageModel.get_peft_model(
 8、配置训练器超参
 """
 
-args = new TrainingArguments(
+args = TrainingArguments(
     per_device_train_batch_size=2, #每个设备批次大小
     gradient_accumulation_steps=4,  # 梯度累积步数，批次大小建议调整这个（变相模拟更大batch_size）  总批次大小=per_device_train_batch_size*gradient_accumulation_steps = 8
     warmup_steps=5,  # 学习率预热步数。
@@ -197,14 +199,15 @@ args = new TrainingArguments(
 """
 9、设置训练器
 """
+from trl import SFTTrainer
 
-trainer = SFTTrainner(
-    model=model, #设置模型
-    tokenizer=tokenizer, #设置解析器
-    train_dataset=dataset, #设置训练数据集
-    dataset_text_field="text", #设置标签
-    max_seq_length=max_seq_length, #设置最大上下文
-    dataset_num_proc=2, #预处理数据集的进程数,
+trainer = SFTTrainer(
+    model = model, #设置模型
+    tokenizer = tokenizer, #设置解析器
+    train_dataset = dataset, #设置训练数据集
+    dataset_text_field = "text", #设置标签
+    max_seq_length = max_seq_length, #设置最大上下文
+    dataset_num_proc = 2, #预处理数据集的进程数,
     args=args #训练超参
 )
 
@@ -248,48 +251,48 @@ trainer_stats = trainer.train()
 """
 
 
-prompt_style = """以下是一项任务说明，并附带了更详细的背景信息。
-请撰写一个满足完成请求的回复。
-在回答之前，请仔细考虑问题，并创建一个逐步的思考链，以确保逻辑和准确的回答。
-
-### Instruction:
-你是一个资深的小红书文案专家
-请你根据以下问题完成写作
-### Question:
-{}
-### Response:
-<think>{}
-"""
-question = "写一篇小红书风格的帖子，标题是男生变帅只需三步丨分享逆袭大干货  "
-
-
-FastLanguageModel.for_inference(model)
-inputs = tokenizer([prompt_style.format(question, "")], return_tensors="pt").to("cuda")
-outputs = model.generate(
-    input_ids=inputs.input_ids,
-    attention_mask=inputs.attention_mask,
-    max_new_tokens=1200,
-    use_cache=True,
-)
-response = tokenizer.batch_decode(outputs)
-print(response[0].split("### Response:")[1])
+# prompt_style = """以下是一项任务说明，并附带了更详细的背景信息。
+# 请撰写一个满足完成请求的回复。
+# 在回答之前，请仔细考虑问题，并创建一个逐步的思考链，以确保逻辑和准确的回答。
+#
+# ### Instruction:
+# 你是一个资深的小红书文案专家
+# 请你根据以下问题完成写作
+# ### Question:
+# {}
+# ### Response:
+# <think>{}
+# """
+# question = "写一篇小红书风格的帖子，标题是男生变帅只需三步丨分享逆袭大干货  "
+#
+#
+# FastLanguageModel.for_inference(model)
+# inputs = tokenizer([prompt_style.format(question, "")], return_tensors="pt").to("cuda")
+# outputs = model.generate(
+#     input_ids=inputs.input_ids,
+#     attention_mask=inputs.attention_mask,
+#     max_new_tokens=1200,
+#     use_cache=True,
+# )
+# response = tokenizer.batch_decode(outputs)
+# print(response[0].split("### Response:")[1])
 """
 模型调试结束
 """
 """
 模型导出
 """
-new_model_local = "路径"
-#保存预训练lora适配器
-model.save_pretrained(new_model_local)
-tokenizer.save_pretrained(new_model_local)
-
-
-#合并原模型和lora为统一模型vllm运行
-model.save_pretrained_merged(new_model_local, tokenizer, save_method="merged_16bit")
-
-#合并原模型和lora并量化为qk_k_m
-model.save_pretrained_gguf(new_model_local, tokenizer, save_method="q4_k_m")
+# new_model_local = "/data/llm/models/unsloth/finetune"
+# #保存预训练lora适配器
+# model.save_pretrained(new_model_local)
+# tokenizer.save_pretrained(new_model_local)
+#
+#
+# #合并原模型和lora为统一模型vllm运行
+# model.save_pretrained_merged(new_model_local, tokenizer, save_method="merged_16bit")
+#
+# #合并原模型和lora并量化为qk_k_m
+# model.save_pretrained_gguf(new_model_local, tokenizer, save_method="q4_k_m")
 
 
 """

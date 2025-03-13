@@ -29,7 +29,7 @@ def formatting_prompts_func(examples):
             "text": texts,
         }
 ds =  MsDataset.load('AI-ModelScope/medical-o1-reasoning-SFT', split = "train")
-dataset = ds.map(formatting_prompts_func, batched = True,)
+dataset = ds.map(formatting_prompts_func, batched= True,)
 dataset["text"][0]
 
 model = FastLanguageModel.get_peft_model(
