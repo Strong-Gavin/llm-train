@@ -68,7 +68,7 @@ load_in_4bit = True
 
 # 加载模型和对应的tokenizer
 model,tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "/data/code/llm/models /DeepSeek-R1-Distill-Qwen-7B",
+    model_name = "/data/code/llm/models/DeepSeek-R1-Distill-Qwen-7B",
     max_seq_length = max_seq_length,  #控制上下文长度，建议测试时2048
     dtype = dtype, #在新一代的GPU建议使用torch.float16或者torch.bfloat16
     load_in_4bit = load_in_4bit  #开启4位量化，降低4倍显存微调可以运行在16G显存，在GPU可以设置none，比如H100提升准确率
@@ -282,17 +282,22 @@ trainer_stats = trainer.train()
 """
 模型导出
 """
-# new_model_local = "/data/llm/models/unsloth/finetune"
-# #保存预训练lora适配器
-# model.save_pretrained(new_model_local)
-# tokenizer.save_pretrained(new_model_local)
+new_model_local = "/data/llm/models/unsloth/finetune"
+#保存预训练lora适配器
+model.save_pretrained(new_model_local)
+tokenizer.save_pretrained(new_model_local)
 #
-#
+
+
+new_model_local_vllm = "/data/llm/models/unsloth/finetune-vllm"
+
 # #合并原模型和lora为统一模型vllm运行
-# model.save_pretrained_merged(new_model_local, tokenizer, save_method="merged_16bit")
-#
+model.save_pretrained_merged(new_model_local_vllm, tokenizer, save_method="merged_16bit")
+
+
+new_model_local_gguf = "/data/llm/models/unsloth/finetune-gguf"
 # #合并原模型和lora并量化为qk_k_m
-# model.save_pretrained_gguf(new_model_local, tokenizer, save_method="q4_k_m")
+model.save_pretrained_gguf(new_model_local_gguf, tokenizer, save_method="q4_k_m")
 
 
 """
